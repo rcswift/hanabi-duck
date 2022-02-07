@@ -91,6 +91,10 @@ class Board:
             if self.played_cards[played_card.color] == played_card.number - 1:
                 logging.info(f"Player {self.current_player()} played from slot {turn.index}, {str(played_card)} successfully")
                 self.played_cards[played_card.color] += 1
+
+                if played_card.number == 5:
+                    self.clues += 1
+                    self.clues = max(self.clues, 8)
             else:
                 logging.info(f"Player {self.current_player()} tried to play from slot {turn.index}, {str(played_card)}")
                 self.discarded_cards.append(played_card)
