@@ -6,15 +6,17 @@ import random
 
 # Turn
 @dataclass
-class Hint:
+class Clue:
     target: int
+    # target is the index into visible_hands or (1 + the number relative to us)
+    # i.e. 0 will be the next player, 1 will be the player in 2 turns etc.
+    # negative targets are valid: -2 is the player before me
     color: str = None
     number: int = None
 
     def __post_init__(self):
-        if (color is None) == (number is None):
+        if (self.color is None) == (self.number is None):
             raise ValueError("Exactly one of color and number must be specified")
-
 @dataclass
 class Discard:
     index: int
@@ -22,7 +24,7 @@ class Discard:
 class Play:
     index: int
 
-Turn = Union[Hint, Discard, Play]
+Turn = Union[Clue, Discard, Play]
 
 @dataclass
 class Card:
@@ -40,21 +42,20 @@ class Board:
     def __init__(self, num_players=4, seed=None, starting_player=0):
         self.num_players = num_players
 
-        ### Hidden attributes ###
-        # This is the unseen deck. DO NOT ACCESS THIS ATTRIBUTE
-        self._deck: List[Card] = [Card(c, n + 1) for c in "rygbp" for n in range(5)]
+        ### Hidden attributes. DO NOT ACCESS THESE ATTRIBUTES IN YOUR BOT ###
+        self._deck: List[Card] = [Card(c, n) for c in "rygbp" for n in (1, 1, 1, 2, 2, 3, 3, 4, 4, 5)]
         random.seed(seed)
         random.shuffle(self._deck)
+
+        self._hands: List[List[Card]] = [[] for i in range(num_players)]
+        for i in range(num_players):
+            for j in range(4): # TODO: make number of cards per player dynamic
+                self._draw_card(i)
 
         # History
         self.turns: List[Turn] = [] # History of turns. For debugging only I think
 
         # Visible board state
-        self.hands: List[List[Card]] = [[] for i in range(num_players)]
-        for i in range(num_players):
-            for j in range(4): # TODO: make number of cards per player dynamic
-                self._draw_card(i)
-
         self.played_cards: Dict[str, int] = {"r": 0, "y": 0, "g": 0, "b": 0, "p": 0}
         self.discarded_cards: List[Card] = []
         self.starting_player: int = 0
@@ -67,20 +68,21 @@ class Board:
         return (self.turn_index + self.starting_player) % self.num_players
 
     def evaluate(self, turn: Turn):
-        hand = self.hands[self.current_player()]
+        hand = self._hands[self.current_player()]
 
-        if isinstance(turn, Hint):
-            logging.info(f"Player {self.current_player()} clued {turn.color or turn.number}")
+        if isinstance(turn, Clue):
+            target = (self.current_player() + turn.target + 1) % self.num_players
+            logging.info(f"Player {self.current_player()} clued player {target} {turn.color or turn.number}")
 
             if target == self.current_player:
-                raise InvalidMove("cannot target self")
-            if clues == 0:
+                raise InvalidMove("cannot clue self")
+            if self.clues == 0:
                 raise InvalidMove("no clues available")
 
-            for card in self.hands[turn.target]:
+            for card in self._hands[target]:
                 if card.number == turn.number or card.color == turn.color:
                     card.clued = True
-            # TODO: A hint must clue a card. For duck, negative clues are worthless though so not going to implement.
+            # TODO: A Clue must clue a card. For duck, negative clues are worthless though so not going to implement.
 
             self.clues -= 1
         elif isinstance(turn, Play):
@@ -96,11 +98,11 @@ class Board:
 
             self._draw_card()
         elif isinstance(turn, Discard):
-            if clues == 8:
+            if self.clues == 8:
                 logging.debug("Cannot discard at max clues")
                 raise InvalidMove("cannot discard at max clues")
+            discarded_card = hand.pop(turn.index)
             logging.info(f"Player {self.current_player()} discarded the card in slot {turn.index}, {str(discarded_card)}")
-            discarded_card = hand.pop[turn.index]
             self.discarded_cards.append(discarded_card)
             self._draw_card()
             self.clues += 1
@@ -119,15 +121,28 @@ class Board:
         if self._deck:
             new_card = self._deck.pop()
             player = index if index is not None else self.current_player()
-            self.hands[player].insert(0, new_card)
+            self._hands[player].insert(0, new_card)
         else:
-            self.turns_left = self.num_players + 1
+            if self.turns_left is None:
+                self.turns_left = self.num_players + 1
 
     def is_game_over(self) -> bool:
         return self.strikes == 3 or all(v == 5 for v in self.played_cards.values()) or self.turns_left == 0
 
     def score(self) -> int:
         return sum(self.played_cards.values())
+
+    def visible_hands(self) -> List[List[Card]]:
+        """Other players' hands from the perspective of the current player"""
+        return self._hands[self.current_player() + 1:] + self._hands[:self.current_player()]
+
+    def my_hand_clues(self) -> List[bool]:
+        """Which cards in my hand are clued"""
+        return [card.clued for card in self._hands[self.current_player()]]
+
+    def my_hand_size(self) -> int:
+        """How many cards are in my hand"""
+        return len(self._hands[self.current_player()])
 
     def __str__(self):
         newline = "\n"
@@ -137,9 +152,9 @@ class Board:
         Played cards ({self.score()} / 25):
             {self.played_cards}
 
-        Hands:{newline}{indent(newline.join(" ".join(map(str, hand)) + (" <- current" if i == self.current_player() else "") for i, hand in enumerate(self.hands)), " " * 12)}
+        Hands:{newline}{indent(newline.join(" ".join(map(str, hand)) + (" <- current" if i == self.current_player() else "") for i, hand in enumerate(self._hands)), " " * 12)}
 
-        {self.strikes} strikes, {self.clues} clues
+        {self.strikes} strikes, {self.clues} clues, {f"{self.turns_left} turns remaining" if self.turns_left is not None else ""}
 
         Discarded:
             {" ".join(map(str, self.discarded_cards))}

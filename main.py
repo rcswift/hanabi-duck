@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from bot import BaseBot, DumbBot
+from bot import BaseBot, BasicCheatingBot, DumbBot
 from hanabi import Board
 
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +20,7 @@ def run(bots, seed=None):
     logging.warning(f"Game is complete with a score of {board.score()}")
     return board.score()
 
-def score_bot(players: List[BaseBot], num_players=4, trials=100, starting_seed=None) -> float:
+def score_bot(players: List[BaseBot], num_players=4, trials=100, starting_seed=None) -> List[int]:
     """Get a bot's average score"""
 
     scores = []
@@ -31,11 +31,18 @@ def score_bot(players: List[BaseBot], num_players=4, trials=100, starting_seed=N
         for p in players:
             p.reset()
 
-    result = sum(scores) / trials
-    logging.warning(f"Completed {trials} trials of bot with an average score of {result} " +
-        f"(max: {max(scores)}, min: {min(scores)})")
-    return result
+    return scores
 
 if __name__ == "__main__":
     NUM_PLAYERS = 4
-    score_bot([DumbBot() for i in range(NUM_PLAYERS)], starting_seed=0)
+
+    # Score your bot on 100 runs
+    bot = BasicCheatingBot
+    scores = score_bot([bot() for i in range(NUM_PLAYERS)], starting_seed=0)
+    final_result = (f"Bot {bot.__name__} completed {len(scores)} trials with an average score of {sum(scores) / len(scores)} " +
+        f"(max: {max(scores)}, min: {min(scores)}, {scores.count(25)} perfect)")
+    logging.warning(final_result)
+    print(final_result)
+
+    # Test your bot once
+    # run([bot() for i in range(NUM_PLAYERS)], seed=0)
