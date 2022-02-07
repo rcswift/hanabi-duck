@@ -61,13 +61,13 @@ class CheatingBot(BaseBot):
     def play(self, board: Board) -> Turn:
         hand = board._hands[board.current_player()]
 
-        # Play any playable cards
+        # Play any playable cards. Neither ascending or descending order seem to help
         for i, card in enumerate(hand):
             if self.is_playable(card, board):
                 return Play(i)
 
-        # Clue if we have max clues
-        if board.clues == 8:
+        # Clue if we're close to max clues
+        if board.clues > 6:
             return Clue(target=1, color="r")
 
         # Discard if we have freely discardable cards
@@ -80,7 +80,7 @@ class CheatingBot(BaseBot):
             return Clue(target=1, color="r")
 
         # Discard any cards that don't need to be saved
-        # hand.sort(key=lambda x: x.number, reverse=True) # this discards 4 > 3 > 2, but doesn't help
+        hand.sort(key=lambda x: x.number, reverse=True) # this discards 4 > 3 > 2, but barely helps
         for i, card in enumerate(hand):
             if not self.is_unique(card, board):
                 return Discard(i)

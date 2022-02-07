@@ -31,4 +31,4 @@ Scores are average of seeds 0-99 and are out of 25.
 Cheating bots: These bots access their own hands.
 
 - BasicCheatingBot (23.17): Look at its own cards. Play any playable cards. Clue unnecessarily. Discard the last card
-- CheatingBot (24.89): Looks at its own cards, prioritizing safe discards
+- CheatingBot (24.95): Looks at its own cards, prioritizing safe discards
