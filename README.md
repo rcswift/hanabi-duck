@@ -27,6 +27,7 @@ The signatures for these classes are at the top of `hanabi.py`
 Scores are average of seeds 0-99 and are out of 25.
 
 - DumbBot (1.56): Always plays the first card.
+- ClueBot (6.56): Plays clued cards and clues playable cards
 
 Cheating bots: These bots access their own hands.
 

@@ -51,7 +51,7 @@ class BasicCheatingBot(BaseBot):
         if board.clues == 0:
             return Discard(board.my_hand_size() - 1)
         else:
-            return Clue(target=1, color="r") # Clue the next player red
+            return Clue(target=0, color="r") # Clue the next player red
 
 class CheatingBot(BaseBot):
     """
@@ -68,7 +68,7 @@ class CheatingBot(BaseBot):
 
         # Clue if we're close to max clues
         if board.clues > 6:
-            return Clue(target=1, color="r")
+            return Clue(target=0, color="r")
 
         # Discard if we have freely discardable cards
         for i, card in enumerate(hand):
@@ -77,7 +77,7 @@ class CheatingBot(BaseBot):
 
         # Clue if we have clues left
         if board.clues > 0:
-            return Clue(target=1, color="r")
+            return Clue(target=0, color="r")
 
         # Discard any cards that don't need to be saved
         hand.sort(key=lambda x: x.number, reverse=True) # this discards 4 > 3 > 2, but barely helps
@@ -88,3 +88,26 @@ class CheatingBot(BaseBot):
         # Last resort, discard
         logging.warning("If this happens, the bot needs to be more sophisticated and take turn order into account")
         return Discard(0)
+
+class ClueBot(BaseBot):
+    """Clues playable cards"""
+    def play(self, board: Board) -> Turn:
+        # Play clued cards
+        for i, is_clued in enumerate(board.my_hand_clues()):
+            if is_clued:
+                return Play(i)
+
+        # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
+        if board.clues == 0:
+            return Discard(board.my_hand_size() - 1)
+
+        # Clue playable cards
+        for i, hand in enumerate(board.visible_hands()):
+            for j, card in enumerate(hand):
+                if self.is_playable(card, board):
+                    return Clue(target=i, color=card.color) # todo: pick the least ambiguous target
+
+        # Otherwise discard last card
+        if board.clues >= 7:
+            return Clue(target=0, color="r") # throwaway clue. this is technically not allowed
+        return Discard(board.my_hand_size() - 1)

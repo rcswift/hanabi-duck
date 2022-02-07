@@ -103,7 +103,7 @@ class Board:
             self._draw_card()
         elif isinstance(turn, Discard):
             if self.clues == 8:
-                logging.debug("Cannot discard at max clues")
+                logging.warning("Cannot discard at max clues")
                 raise InvalidMove("cannot discard at max clues")
             discarded_card = hand.pop(turn.index)
             logging.info(f"Player {self.current_player()} discarded the card in slot {turn.index}, {str(discarded_card)}")
