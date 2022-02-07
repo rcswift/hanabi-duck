@@ -1,10 +1,10 @@
 import logging
 from typing import List
 
-from bot import BaseBot, BasicCheatingBot, DumbBot
+from bot import *
 from hanabi import Board
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 # I misuse logging here. Debug is for debugging, info is for watching a single game, warning is for many runs of the bot
 
 def run(bots, seed=None):
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     NUM_PLAYERS = 4
 
     # Score your bot on 100 runs
-    bot = BasicCheatingBot
+    bot = CheatingBot
     scores = score_bot([bot() for i in range(NUM_PLAYERS)], starting_seed=0)
     final_result = (f"Bot {bot.__name__} completed {len(scores)} trials with an average score of {sum(scores) / len(scores)} " +
         f"(max: {max(scores)}, min: {min(scores)}, {scores.count(25)} perfect)")
