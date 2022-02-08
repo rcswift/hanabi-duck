@@ -64,15 +64,16 @@ class Board:
         self.strikes = 0
         self.clues = 8
 
+    @property
     def current_player(self):
         return (self.turn_index + self.starting_player) % self.num_players
 
     def evaluate(self, turn: Turn):
-        hand = self._hands[self.current_player()]
+        hand = self._hands[self.current_player]
 
         if isinstance(turn, Clue):
-            target = (self.current_player() + turn.target + 1) % self.num_players
-            logging.info(f"Player {self.current_player()} clued player {target} {turn.color or turn.number}")
+            target = (self.current_player + turn.target + 1) % self.num_players
+            logging.info(f"Player {self.current_player} clued player {target} {turn.color or turn.number}")
 
             if target == self.current_player:
                 raise InvalidMove("cannot clue self")
@@ -89,14 +90,14 @@ class Board:
             played_card = hand.pop(turn.index)
 
             if self.played_cards[played_card.color] == played_card.number - 1:
-                logging.info(f"Player {self.current_player()} played from slot {turn.index}, {str(played_card)} successfully")
+                logging.info(f"Player {self.current_player} played from slot {turn.index}, {str(played_card)} successfully")
                 self.played_cards[played_card.color] += 1
 
                 if played_card.number == 5:
                     self.clues += 1
                     self.clues = max(self.clues, 8)
             else:
-                logging.info(f"Player {self.current_player()} tried to play from slot {turn.index}, {str(played_card)}")
+                logging.info(f"Player {self.current_player} tried to play from slot {turn.index}, {str(played_card)}")
                 self.discarded_cards.append(played_card)
                 self.strikes += 1
 
@@ -106,7 +107,7 @@ class Board:
                 logging.warning("Cannot discard at max clues")
                 raise InvalidMove("cannot discard at max clues")
             discarded_card = hand.pop(turn.index)
-            logging.info(f"Player {self.current_player()} discarded the card in slot {turn.index}, {str(discarded_card)}")
+            logging.info(f"Player {self.current_player} discarded the card in slot {turn.index}, {str(discarded_card)}")
             self.discarded_cards.append(discarded_card)
             self._draw_card()
             self.clues += 1
@@ -124,7 +125,7 @@ class Board:
 
         if self._deck:
             new_card = self._deck.pop()
-            player = index if index is not None else self.current_player()
+            player = index if index is not None else self.current_player
             self._hands[player].insert(0, new_card)
         else:
             if self.turns_left is None:
@@ -138,15 +139,15 @@ class Board:
 
     def visible_hands(self) -> List[List[Card]]:
         """Other players' hands from the perspective of the current player"""
-        return self._hands[self.current_player() + 1:] + self._hands[:self.current_player()]
+        return self._hands[self.current_player + 1:] + self._hands[:self.current_player]
 
     def my_hand_clues(self) -> List[bool]:
         """Which cards in my hand are clued"""
-        return [card.clued for card in self._hands[self.current_player()]]
+        return [card.clued for card in self._hands[self.current_player]]
 
     def my_hand_size(self) -> int:
         """How many cards are in my hand"""
-        return len(self._hands[self.current_player()])
+        return len(self._hands[self.current_player])
 
     def __str__(self):
         newline = "\n"
@@ -156,7 +157,7 @@ class Board:
         Played cards ({self.score()} / 25):
             {self.played_cards}
 
-        Hands:{newline}{indent(newline.join(" ".join(map(str, hand)) + (" <- current" if i == self.current_player() else "") for i, hand in enumerate(self._hands)), " " * 12)}
+        Hands:{newline}{indent(newline.join(" ".join(map(str, hand)) + (" <- current" if i == self.current_player else "") for i, hand in enumerate(self._hands)), " " * 12)}
 
         {self.strikes} strikes, {self.clues} clues, {f"{self.turns_left} turns remaining" if self.turns_left is not None else ""}
 

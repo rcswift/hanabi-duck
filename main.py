@@ -12,7 +12,7 @@ def run(bots, seed=None):
     board = Board(NUM_PLAYERS, seed)
 
     while not board.is_game_over():
-        turn = bots[board.current_player()].play(board)
+        turn = bots[board.current_player].play(board)
         board.evaluate(turn)
 
         logging.info(str(board))

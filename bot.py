@@ -43,7 +43,7 @@ class BasicCheatingBot(BaseBot):
     Its main problem is discarding 5s from the initial deal
     """
     def play(self, board: Board) -> Turn:
-        hand = board._hands[board.current_player()]
+        hand = board._hands[board.current_player]
         for i, card in zip(range(board.my_hand_size() - 1, -1, -1), reversed(hand)):
 
             if self.is_playable(card, board):
@@ -59,7 +59,7 @@ class CheatingBot(BaseBot):
     Its weakness is probably getting unlucky with draws and running out of turns
     """
     def play(self, board: Board) -> Turn:
-        hand = board._hands[board.current_player()]
+        hand = board._hands[board.current_player]
 
         # Play any playable cards. Neither ascending or descending order seem to help
         for i, card in enumerate(hand):
