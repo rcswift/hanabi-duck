@@ -8,9 +8,6 @@ import random
 @dataclass
 class Clue:
     target: int
-    # target is the index into visible_hands or (1 + the number relative to us)
-    # i.e. 0 will be the next player, 1 will be the player in 2 turns etc.
-    # negative targets are valid: -2 is the player before me
     color: str = None
     number: int = None
 
@@ -39,16 +36,19 @@ class InvalidMove(Exception):
     pass
 
 class Board:
-    def __init__(self, num_players=4, seed=None, starting_player=0):
+    def __init__(self, num_players, seed=None, starting_player=0):
         self.num_players = num_players
 
+        self.reset(seed, starting_player)
+
+    def reset(self, seed=None, starting_player=0):
         ### Hidden attributes. DO NOT ACCESS THESE ATTRIBUTES IN YOUR BOT ###
         self._deck: List[Card] = [Card(c, n) for c in "rygbp" for n in (1, 1, 1, 2, 2, 3, 3, 4, 4, 5)]
         random.seed(seed)
         random.shuffle(self._deck)
 
-        self._hands: List[List[Card]] = [[] for i in range(num_players)]
-        for i in range(num_players):
+        self._hands: List[List[Card]] = [[] for i in range(self.num_players)]
+        for i in range(self.num_players):
             for j in range(4): # TODO: make number of cards per player dynamic
                 self._draw_card(i)
 
@@ -65,7 +65,7 @@ class Board:
         self.clues = 8
 
     @property
-    def current_player(self):
+    def current_player(self) -> int:
         return (self.turn_index + self.starting_player) % self.num_players
 
     @property
@@ -77,9 +77,10 @@ class Board:
         return sum(self.played_cards.values())
 
     @property
-    def visible_hands(self) -> List[List[Card]]:
+    def visible_hands(self) -> List[(int, List[Card])]:
         """Other players' hands from the perspective of the current player"""
-        return self._hands[self.current_player + 1:] + self._hands[:self.current_player]
+        tmp = enumerate(self._hands)
+        return tmp[self.current_player + 1:] + tmp[:self.current_player]
 
     @property
     def my_hand_clues(self) -> List[bool]:
@@ -153,6 +154,22 @@ class Board:
         else:
             if self.turns_left is None:
                 self.turns_left = self.num_players + 1
+
+    #
+    # Common helper functions
+    #
+    def is_playable(self, card: Card) -> bool:
+        """can a card be played immediately?"""
+        return self.played_cards[card.color] == card.number - 1
+
+    def is_discardable(self, card: Card) -> bool:
+        """can a card be discarded? these cards are greyed out in the web version"""
+        return self.played_cards[card.color] >= card.number
+
+    def is_unique(self, card: Card) -> bool:
+        """does a card need to be saved? these cards have a red exclamation point in the web version"""
+        original_count = {5: 1, 4: 2, 3: 2, 2: 2, 1: 3}[card.number] # original number of copies of that card
+        return (original_count - self.discarded_cards.count(card)) == 1
 
     def __str__(self):
         newline = "\n"
