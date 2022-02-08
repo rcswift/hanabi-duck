@@ -11,14 +11,14 @@ def run(bots, seed=None):
     """Run a single game"""
     board = Board(NUM_PLAYERS, seed)
 
-    while not board.is_game_over():
+    while not board.game_over:
         turn = bots[board.current_player].play(board)
         board.evaluate(turn)
 
         logging.info(str(board))
 
-    logging.warning(f"Game is complete with a score of {board.score()}")
-    return board.score()
+    logging.warning(f"Game is complete with a score of {board.score}")
+    return board.score
 
 def score_bot(players: List[BaseBot], num_players=4, trials=100, starting_seed=None) -> List[int]:
     """Get a bot's average score"""

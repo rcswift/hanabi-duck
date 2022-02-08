@@ -68,6 +68,29 @@ class Board:
     def current_player(self):
         return (self.turn_index + self.starting_player) % self.num_players
 
+    @property
+    def game_over(self) -> bool:
+        return self.strikes == 3 or all(v == 5 for v in self.played_cards.values()) or self.turns_left == 0
+
+    @property
+    def score(self) -> int:
+        return sum(self.played_cards.values())
+
+    @property
+    def visible_hands(self) -> List[List[Card]]:
+        """Other players' hands from the perspective of the current player"""
+        return self._hands[self.current_player + 1:] + self._hands[:self.current_player]
+
+    @property
+    def my_hand_clues(self) -> List[bool]:
+        """Which cards in my hand are clued"""
+        return [card.clued for card in self._hands[self.current_player]]
+
+    @property
+    def my_hand_size(self) -> int:
+        """How many cards are in my hand"""
+        return len(self._hands[self.current_player])
+
     def evaluate(self, turn: Turn):
         hand = self._hands[self.current_player]
 
@@ -131,30 +154,12 @@ class Board:
             if self.turns_left is None:
                 self.turns_left = self.num_players + 1
 
-    def is_game_over(self) -> bool:
-        return self.strikes == 3 or all(v == 5 for v in self.played_cards.values()) or self.turns_left == 0
-
-    def score(self) -> int:
-        return sum(self.played_cards.values())
-
-    def visible_hands(self) -> List[List[Card]]:
-        """Other players' hands from the perspective of the current player"""
-        return self._hands[self.current_player + 1:] + self._hands[:self.current_player]
-
-    def my_hand_clues(self) -> List[bool]:
-        """Which cards in my hand are clued"""
-        return [card.clued for card in self._hands[self.current_player]]
-
-    def my_hand_size(self) -> int:
-        """How many cards are in my hand"""
-        return len(self._hands[self.current_player])
-
     def __str__(self):
         newline = "\n"
         return dedent(f"""
         ================ Game at turn {self.turn_index} ===================
 
-        Played cards ({self.score()} / 25):
+        Played cards ({self.score} / 25):
             {self.played_cards}
 
         Hands:{newline}{indent(newline.join(" ".join(map(str, hand)) + (" <- current" if i == self.current_player else "") for i, hand in enumerate(self._hands)), " " * 12)}

@@ -44,12 +44,12 @@ class BasicCheatingBot(BaseBot):
     """
     def play(self, board: Board) -> Turn:
         hand = board._hands[board.current_player]
-        for i, card in zip(range(board.my_hand_size() - 1, -1, -1), reversed(hand)):
+        for i, card in zip(range(board.my_hand_size - 1, -1, -1), reversed(hand)):
 
             if self.is_playable(card, board):
                 return Play(i)
         if board.clues == 0:
-            return Discard(board.my_hand_size() - 1)
+            return Discard(board.my_hand_size - 1)
         else:
             return Clue(target=0, color="r") # Clue the next player red
 
@@ -93,16 +93,16 @@ class ClueBot(BaseBot):
     """Clues playable cards"""
     def play(self, board: Board) -> Turn:
         # Play clued cards
-        for i, is_clued in enumerate(board.my_hand_clues()):
+        for i, is_clued in enumerate(board.my_hand_clues):
             if is_clued:
                 return Play(i)
 
         # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
         if board.clues == 0:
-            return Discard(board.my_hand_size() - 1)
+            return Discard(board.my_hand_size - 1)
 
         # Clue playable cards
-        for i, hand in enumerate(board.visible_hands()):
+        for i, hand in enumerate(board.visible_hands):
             for j, card in enumerate(hand):
                 if self.is_playable(card, board):
                     return Clue(target=i, color=card.color) # todo: pick the least ambiguous target
@@ -110,4 +110,4 @@ class ClueBot(BaseBot):
         # Otherwise discard last card
         if board.clues >= 7:
             return Clue(target=0, color="r") # throwaway clue. this is technically not allowed
-        return Discard(board.my_hand_size() - 1)
+        return Discard(board.my_hand_size - 1)
