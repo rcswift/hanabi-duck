@@ -1,13 +1,12 @@
 from dataclasses import dataclass, field
 import logging
 from textwrap import dedent, indent
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Set
 import random
 
 CARD_COLORS = ["r", "y", "g", "b", "p"]
 CARD_NUMBERS = [1, 1, 1, 2, 2, 3, 3, 4, 4, 5]
-CARD_NUMBERS_UNIQUE = list(set(CARD_NUMBERS))
-CARD_COUNT = {i: CARD_NUMBERS.count(i) for i in CARD_NUMBERS_UNIQUE}
+CARD_COUNT = {i: CARD_NUMBERS.count(i) for i in set(CARD_NUMBERS)}
 
 MAX_CLUES = 8
 
@@ -41,8 +40,8 @@ class Card:
 @dataclass
 class CardInformation:
     # This syntax is required to initialize each new CardInformation object with a COPY of the constant values
-    color: List[str] = field(default_factory=lambda: list(CARD_COLORS))
-    number: List[int] = field(default_factory=lambda: list(CARD_NUMBERS_UNIQUE))
+    color: Set[str] = field(default_factory=lambda: set(CARD_COLORS))
+    number: Set[int] = field(default_factory=lambda: set(CARD_NUMBERS))
     clued: bool = False
 
     def __str__(self):
@@ -148,20 +147,18 @@ class Board:
             if turn.color:
                 if card.color == turn.color:
                     self.information[target][idx].color.clear()
-                    self.information[target][idx].color.append(turn.color)
+                    self.information[target][idx].color.add(turn.color)
                     self.information[target][idx].clued = True
                 else:
-                    if turn.color in self.information[target][idx].color:
-                        self.information[target][idx].color.remove(turn.color)
+                    self.information[target][idx].color.discard(turn.color)
 
             if turn.number:
                 if card.number == turn.number:
                     self.information[target][idx].number.clear()
-                    self.information[target][idx].number.append(turn.number)
+                    self.information[target][idx].number.add(turn.number)
                     self.information[target][idx].clued = True
                 else:
-                    if turn.number in self.information[target][idx].number:
-                        self.information[target][idx].number.remove(turn.number)
+                    self.information[target][idx].number.discard(turn.number)
         logging.info(f"Player {target} New Information: {[str(x) for x in self.information[target]]}")
 
         self.clues -= 1
