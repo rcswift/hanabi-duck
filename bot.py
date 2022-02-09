@@ -3,7 +3,7 @@ import logging
 
 from operator import and_, not_, or_, eq
 
-from hanabi import Board, CardInformation, Clue, Discard, Play, CARD_NUMBERS, CARD_COLORS
+from hanabi import Board, CardInfo, Clue, Discard, Play, CARD_NUMBERS, CARD_COLORS
 
 class BaseBot():
     def __init__(self, board: Board, index: int):
@@ -39,12 +39,12 @@ class BasicCheatingBot(BaseBot):
     """
     def play(self) -> Turn:
         hand = self.board._hands[self.board.current_player]
-        for i, card in zip(range(self.board.my_hand_size - 1, -1, -1), reversed(hand)):
+        for i, card in zip(range(self.board.current_hand_size - 1, -1, -1), reversed(hand)):
 
             if self.board.is_playable(card):
                 return Play(i)
         if self.board.clues == 0:
-            return Discard(self.board.my_hand_size - 1)
+            return Discard(self.board.current_hand_size - 1)
         else:
             return Clue(target=self.board.relative_player(1), color="r") # Clue the next player red
 
@@ -88,13 +88,13 @@ class ClueBot(BaseBot):
     """Clues playable cards"""
     def play(self) -> Turn:
         # Play clued cards
-        for i, card_info in enumerate(self.board.current_information):
+        for i, card_info in enumerate(self.board.current_info):
             if card_info.clued:
                 return Play(i)
 
         # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
         if self.board.clues == 0:
-            return Discard(self.board.my_hand_size - 1)
+            return Discard(self.board.current_hand_size - 1)
 
         # Clue playable cards
         for player_idx, hand in self.board.visible_hands:
@@ -105,26 +105,26 @@ class ClueBot(BaseBot):
         # Otherwise discard last card
         if self.board.clues >= 7:
             return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
-        return Discard(self.board.my_hand_size - 1)
+        return Discard(self.board.current_hand_size - 1)
 
 class ClueBotImproved(BaseBot):
     """Prioritizes clues based on turn order"""
     
     def play(self) -> Turn:
         # Play clued cards
-        for i, card_info in enumerate(self.board.current_information):
+        for i, card_info in enumerate(self.board.current_info):
             # Play cards from right to left
             if card_info.clued:
                 return Play(i)
 
         # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
         if self.board.clues == 0:
-            return Discard(self.board.my_hand_size - 1)
+            return Discard(self.board.current_hand_size - 1)
 
         # Clue playable cards in order of preference:
         for player_idx, hand in self.board.visible_hands:
             for card_idx, card in enumerate(hand):
-                if self.board.is_playable(card) and not self.board.information[player_idx][card_idx].clued:
+                if self.board.is_playable(card) and not self.board.get_info(player_idx)[card_idx].clued:
                     # Decide if Number or Color is better:
                     cards_touched_by_number = sum([c.number == card.number for c in hand])
                     cards_touched_by_color = sum([c.color == card.color for c in hand])
@@ -137,14 +137,23 @@ class ClueBotImproved(BaseBot):
         # Otherwise discard last card
         if self.board.clues >= 7:
             return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
-        return Discard(self.board.my_hand_size - 1)
+        return Discard(self.board.current_hand_size - 1)
     
 class ClueBotMk3(BaseBot):
-    """More nuanced cluing and discarding"""
+    """
+    More nuanced cluing and discarding.
+    This bot is capable of playing a pefect game, but it has to get really lucky.
+    
+    It's weakness appears to be duplicate cards. The bot does not keep track of what's already been
+    clued in other's hands when forming its own clues, so it can touch a duplicate card. Since it also
+    tries to play every clue, it frequently loses. 
+
+    Average score is about 12 points. 
+    """
     @property
     def chop(self) -> int:
         """Return the index of the highest un-clued card"""
-        non_clued_cards = [idx for idx, info in enumerate(self.board.current_information) if not info.clued]
+        non_clued_cards = [idx for idx, info in enumerate(self.board.current_info) if not info.clued]
         if len(non_clued_cards) == 0:
             chop = 0
         else:
@@ -154,7 +163,7 @@ class ClueBotMk3(BaseBot):
 
     def cards_touched(self, clue: Clue) -> List[bool]:
         """Simulate a clue on a hand to check which cards are touched"""
-        hand = self.board.player_hand(clue.target)
+        hand = self.board.get_hand(clue.target)
         if clue.number:
             return [card.number == clue.number for card in hand]
         elif clue.color:
@@ -162,7 +171,7 @@ class ClueBotMk3(BaseBot):
 
     def play(self) -> Turn:
         # Play clued cards
-        for i, card_info in enumerate(self.board.current_information):
+        for i, card_info in enumerate(self.board.current_info):
             # Play cards from right to left
             if card_info.clued:
                 return Play(i)
@@ -177,11 +186,13 @@ class ClueBotMk3(BaseBot):
         for player_offset in range(1,self.board.num_players):
             target = self.board.relative_player(player_offset)
              # The hand that this potential clue would target
-            hand = self.board.player_hand(target)
+            hand = self.board.get_hand(target)
             # The cards that are immediately playable from this hand
             playable = list(map(self.board.is_playable, hand))
+            # The cards that have not yet been clued
+            not_clued = [not info.clued for info in self.board.get_info(target)]
 
-            should_touch = playable
+            should_touch = list(map(and_, playable, not_clued))
 
             possible_clues = [Clue(target, number=number) for number in set(CARD_NUMBERS)] + [Clue(target, color=color) for color in set(CARD_COLORS)]
 
@@ -190,8 +201,7 @@ class ClueBotMk3(BaseBot):
                 num_touch = sum(would_touch)
 
                 # Check that this clue touches only playable cards
-                if sum(map(eq, should_touch, would_touch)) == self.board.cards_per_player and num_touch != 0:
-                    logging.debug(f"Found good clue: {clue}: {num_touch} cards")
+                if sum(map(eq, should_touch, would_touch)) == len(hand) and num_touch != 0:
                     good_clues.append((clue, num_touch))
 
 
@@ -199,6 +209,9 @@ class ClueBotMk3(BaseBot):
             # Now that we have a list of good clues (clues that touch only immediately playable cards), we pick which one 
             # to give based on which player needs information the most:
             good_clues.sort(key=lambda x: x[1])
+            good_clues.reverse()
+            for clue, num_touch in good_clues:
+                logging.debug(f"Good Clue: {clue} : {num_touch} cards")
             return good_clues[0][0]
         else:
             # Otherwise discard last card
