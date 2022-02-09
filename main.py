@@ -41,7 +41,7 @@ if __name__ == "__main__":
     STARTING_PLAYER = 0
     TRIALS = 100
 
-    bot_type = ClueBot
+    bot_type = ClueBotImproved
 
     board = Board(NUM_PLAYERS, STARTING_SEED, STARTING_PLAYER)
 

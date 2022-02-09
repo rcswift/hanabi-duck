@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 
-from hanabi import Board, Clue, Discard, Play
+from hanabi import Board, CardInformation, Clue, Discard, Play
 
 class BaseBot():
     def __init__(self, board: Board, index: int):
@@ -104,3 +104,37 @@ class ClueBot(BaseBot):
         if self.board.clues >= 7:
             return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
         return Discard(self.board.my_hand_size - 1)
+
+class ClueBotImproved(BaseBot):
+    """Prioritizes clues based on turn order"""
+    
+    def play(self) -> Turn:
+        # Play clued cards
+        for i, card_info in enumerate(self.board.current_information):
+            # Play cards from right to left
+            if card_info.clued:
+                return Play(i)
+
+        # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
+        if self.board.clues == 0:
+            return Discard(self.board.my_hand_size - 1)
+
+        # Clue playable cards in order of preference:
+        for player_idx, hand in self.board.visible_hands:
+            for card_idx, card in enumerate(hand):
+                if self.board.is_playable(card) and not self.board.information[player_idx][card_idx].clued:
+                    # Decide if Number or Color is better:
+                    cards_touched_by_number = sum([c.number == card.number for c in hand])
+                    cards_touched_by_color = sum([c.color == card.color for c in hand])
+
+                    if cards_touched_by_number < cards_touched_by_color:
+                        return Clue(player_idx, number=card.number)
+                    else:
+                        return Clue(player_idx, color=card.color)
+
+        # Otherwise discard last card
+        if self.board.clues >= 7:
+            return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
+        return Discard(self.board.my_hand_size - 1)
+
+    
