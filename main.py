@@ -11,8 +11,10 @@ def run(board: Board, bots: List[BaseBot]):
     """Run a single game"""
 
     while not board.game_over:
-        turn = bots[board.current_player].play()
+        player = board.current_player
+        turn = bots[player].play()
         board.evaluate(turn)
+        (bot.listen(player, turn) for bot in bots)
 
         logging.info(str(board))
 
@@ -39,7 +41,7 @@ if __name__ == "__main__":
     STARTING_PLAYER = 0
     TRIALS = 100
 
-    bot_type = CheatingBot
+    bot_type = ClueBot
 
     board = Board(NUM_PLAYERS, STARTING_SEED, STARTING_PLAYER)
 

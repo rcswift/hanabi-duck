@@ -8,10 +8,18 @@ class BaseBot():
         self.board = board
         self.index = index
 
-    def play(self) -> Turn:
-        raise NotImplemented
+        self.reset()
 
     def reset(self):
+        """Executed once at the start of the game"""
+        pass
+
+    def play(self) -> Turn:
+        """Executed on my turn"""
+        raise NotImplemented
+
+    def listen(self, turn: Turn) -> None:
+        """Executed after every turn"""
         pass
 
 
@@ -36,7 +44,7 @@ class BasicCheatingBot(BaseBot):
         if self.board.clues == 0:
             return Discard(self.board.my_hand_size - 1)
         else:
-            return Clue(target=0, color="r") # Clue the next player red
+            return Clue(target=self.board.relative_player(1), color="r") # Clue the next player red
 
 class CheatingBot(BaseBot):
     """
@@ -53,7 +61,7 @@ class CheatingBot(BaseBot):
 
         # Clue if we're close to max clues
         if self.board.clues > 6:
-            return Clue(target=0, color="r")
+            return Clue(target=self.board.relative_player(1), color="r")
 
         # Discard if we have freely discardable cards
         for i, card in enumerate(hand):
@@ -62,7 +70,7 @@ class CheatingBot(BaseBot):
 
         # Clue if we have clues left
         if self.board.clues > 0:
-            return Clue(target=0, color="r")
+            return Clue(target=self.board.relative_player(1), color="r")
 
         # Discard any cards that don't need to be saved
         hand.sort(key=lambda x: x.number, reverse=True) # this discards 4 > 3 > 2, but barely helps
@@ -78,8 +86,8 @@ class ClueBot(BaseBot):
     """Clues playable cards"""
     def play(self) -> Turn:
         # Play clued cards
-        for i, is_clued in enumerate(self.board.my_hand_clues):
-            if is_clued:
+        for i, card_info in enumerate(self.board.current_information):
+            if card_info.clued:
                 return Play(i)
 
         # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
@@ -94,5 +102,5 @@ class ClueBot(BaseBot):
 
         # Otherwise discard last card
         if self.board.clues >= 7:
-            return Clue(target=0, color="r") # throwaway clue. this is technically not allowed
+            return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
         return Discard(self.board.my_hand_size - 1)
