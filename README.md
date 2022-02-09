@@ -30,6 +30,7 @@ Scores are average of seeds 0-99 and are out of 25.
 - ClueBot (6.56): Plays clued cards and clues playable cards
 - ClueBotImproved (12.36): Avoids giving clues that have already been given and selects between color & number based on which touches fewer additional card.
 - ClueBotMk3 (12.01): Explores all possible clues to try and find the most optimal
+- ListenerBot (16.19): Listens to clues given by others (and itself) to try and avoid giving duplicate clues. 
 
 Cheating bots: These bots access their own hands.
 

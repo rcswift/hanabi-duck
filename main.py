@@ -11,12 +11,14 @@ def run(board: Board, bots: List[BaseBot]):
     """Run a single game"""
 
     while not board.game_over:
+        logging.info(str(board))
+
         player = board.current_player
         turn = bots[player].play()
+        for bot in bots:
+            bot.listen(player, turn)
         board.evaluate(turn)
-        (bot.listen(player, turn) for bot in bots)
 
-        logging.info(str(board))
 
     logging.warning(f"Game is complete with a score of {board.score}")
     return board.score
@@ -41,7 +43,7 @@ if __name__ == "__main__":
     STARTING_PLAYER = 0
     TRIALS = 100
 
-    bot_type = ClueBotImproved
+    bot_type = ListenerBot
 
     board = Board(NUM_PLAYERS, STARTING_SEED, STARTING_PLAYER)
 

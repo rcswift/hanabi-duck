@@ -20,7 +20,7 @@ class BaseBot():
         """Executed on my turn"""
         raise NotImplemented
 
-    def listen(self, turn: Turn) -> None:
+    def listen(self, player: int, turn: Turn) -> None:
         """Executed after every turn"""
         pass
 
@@ -218,3 +218,89 @@ class ClueBotMk3(BaseBot):
             if self.board.clues >= 7:
                 return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
             return Discard(self.chop)
+
+class ListenerBot(BaseBot):
+    """
+    This bot listens to other players' clues to avoid cluing duplicates
+
+    The to_be_played property tracks the value for play clues that have been given.
+    Decisions on wether or not a card is a player are still made based on cards that
+    have actually been played, so there is no concern about order. 
+    """
+    def reset(self):
+        self.to_be_played = {"r": 0, "y": 0, "g": 0, "b": 0, "p": 0}
+
+    @property
+    def chop(self) -> int:
+        """Return the index of the highest un-clued card"""
+        non_clued_cards = [idx for idx, info in enumerate(self.board.current_info) if not info.clued]
+        if len(non_clued_cards) == 0:
+            chop = 0
+        else:
+            chop = max(non_clued_cards)
+        logging.debug(f"Discarding card from position {chop}")
+        return chop
+
+    def already_clued(self, card: Card) -> bool:
+        return self.to_be_played[card.color] >= card.number
+
+    def cards_touched(self, clue: Clue) -> List[bool]:
+        """Simulate a clue on a hand to check which cards are touched"""
+        hand = self.board.get_hand(clue.target)
+        if clue.number:
+            return [card.number == clue.number for card in hand]
+        elif clue.color:
+            return [card.color == clue.color for card in hand]
+
+    def play(self) -> Turn:
+        logging.debug(f"to_be_played: {self.to_be_played}")
+        # Play clued cards
+        for i, card_info in enumerate(self.board.current_info):
+            # Play cards from right to left
+            if card_info.clued:
+                return Play(i)
+
+        # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
+        if self.board.clues == 0:
+            return Discard(self.chop)
+
+        for target in self.board.other_players:
+            # The hand that this potential clue would target
+            hand = self.board.get_hand(target)
+
+            for card in hand:
+                if self.board.is_playable(card) and not self.already_clued(card):
+                    # Decide if Number or Color is better:
+                    cards_touched_by_number = sum([c.number == card.number for c in hand])
+                    cards_touched_by_color = sum([c.color == card.color for c in hand])
+
+                    if cards_touched_by_number <= cards_touched_by_color:
+                        return Clue(target, number=card.number)
+                    else:
+                        return Clue(target, color=card.color)
+
+        # Otherwise discard last card
+        if self.board.clues >= 7:
+            return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
+        return Discard(self.chop)
+                    
+
+    def listen(self, player: int, turn: Turn) -> None:
+        # When a clue is given add those cards to our internal 'to_be_played' tracker so we know not to clue duplicates
+        # This bot is 'listening to itself' rather than also doing this update in the play() method
+        if isinstance(turn, Clue):
+            logging.debug(f"Bot {self.index} Heard Clue from Player {player}: {turn}")
+            if self.index != turn.target:
+                hand = self.board.get_hand(turn.target)
+
+                cards_clued = []
+
+                if turn.number:
+                    cards_clued = [card for card in hand if card.number == turn.number]
+                elif turn.color:
+                    cards_clued = [card for card in hand if card.color == turn.color]
+
+                for card in cards_clued:
+                    if self.board.is_playable(card):
+                        self.to_be_played[card.color] = card.number
+                
