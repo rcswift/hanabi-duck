@@ -57,6 +57,16 @@ class Board:
         self.reset(seed, starting_player)
 
     def reset(self, seed=None, starting_player=0):
+        # Visible board state
+        self.played_cards: Dict[str, int] = {"r": 0, "y": 0, "g": 0, "b": 0, "p": 0}
+        self.discarded_cards: List[Card] = []
+        self.starting_player: int = 0
+        self.turn_index = 0
+        self.turns_left: Optional[int] = None # None until the deck is exhausted, then counts down to 0
+        self.strikes = 0
+        self.clues = MAX_CLUES
+        self.information: List[List[CardInformation]] = [[] for _ in range(self.num_players)]
+
         ### Hidden attributes. DO NOT ACCESS THESE ATTRIBUTES IN YOUR BOT ###
         self._deck: List[Card] = [Card(c, n) for c in CARD_COLORS for n in CARD_NUMBERS]
         random.seed(seed)
@@ -67,19 +77,9 @@ class Board:
             for j in range(self.cards_per_player):
                 self._draw_card(i)
 
-
         # History
         self.turns: List[Turn] = [] # History of turns. For debugging only I think
 
-        # Visible board state
-        self.played_cards: Dict[str, int] = {"r": 0, "y": 0, "g": 0, "b": 0, "p": 0}
-        self.discarded_cards: List[Card] = []
-        self.starting_player: int = 0
-        self.turn_index = 0
-        self.turns_left: Optional[int] = None # None until the deck is exhausted, then counts down to 0
-        self.strikes = 0
-        self.clues = MAX_CLUES
-        self.information: List[List[CardInformation]] = [[CardInformation() for _ in range(self.cards_per_player)] for _ in range(self.num_players)]
 
     @property
     def cards_per_player(self):
@@ -88,6 +88,10 @@ class Board:
     @property
     def current_player(self) -> int:
         return (self.turn_index + self.starting_player) % self.num_players
+
+    @property
+    def other_players(self) -> Set[int]:
+        return set(range(self.num_players)).difference(set([self.current_player]))
 
     @property
     def game_over(self) -> bool:
@@ -115,6 +119,11 @@ class Board:
     def my_hand_size(self) -> int:
         """How many cards are in my hand"""
         return len(self._current_hand)
+
+    def player_hand(self, index: int) -> List[Card]:
+        if index == self.current_player:
+            raise InvalidMove("cannot look at own hand")
+        return self._hands[index]
 
     def evaluate(self, turn: Turn):
         if isinstance(turn, Clue):
@@ -178,12 +187,12 @@ class Board:
             self.discarded_cards.append(played_card)
             self.strikes += 1
 
-        self._draw_card()
-
         # Update information
         logging.info(f"Player {self.current_player} Old Information: {[str(x) for x in self.current_information]}")
         self.current_information.pop(turn.index)
-        self.current_information.insert(0, CardInformation())
+
+        self._draw_card()
+
         logging.info(f"Player {self.current_player} New Information: {[str(x) for x in self.current_information]}")
 
     def _discard_turn(self, turn: Discard):
@@ -193,12 +202,13 @@ class Board:
         discarded_card = self._current_hand.pop(turn.index)
         logging.info(f"Player {self.current_player} discarded the card in slot {turn.index}, {str(discarded_card)}")
         self.discarded_cards.append(discarded_card)
-        self._draw_card()
 
         # Update information
         logging.info(f"Player {self.current_player} Old Information: {[str(x) for x in self.current_information]}")
         self.current_information.pop(turn.index)
-        self.current_information.insert(0, CardInformation())
+
+        self._draw_card()
+
         logging.info(f"Player {self.current_player} New Information: {[str(x) for x in self.current_information]}")
 
         self.clues += 1
@@ -210,6 +220,7 @@ class Board:
             new_card = self._deck.pop()
             player = index if index is not None else self.current_player
             self._hands[player].insert(0, new_card)
+            self.information[player].insert(0, CardInformation())
         else:
             if self.turns_left is None:
                 self.turns_left = self.num_players + 1
