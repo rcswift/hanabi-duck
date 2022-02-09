@@ -28,6 +28,8 @@ Scores are average of seeds 0-99 and are out of 25.
 
 - DumbBot (1.56): Always plays the first card.
 - ClueBot (6.56): Plays clued cards and clues playable cards
+- ClueBotImproved (12.36): Avoids giving clues that have already been given and selects between color & number based on which touches fewer additional card.
+- ClueBotMk3 (12.01): Explores all possible clues to try and find the most optimal
 
 Cheating bots: These bots access their own hands.
 
