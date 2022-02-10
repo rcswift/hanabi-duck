@@ -43,7 +43,7 @@ if __name__ == "__main__":
     STARTING_PLAYER = 0
     TRIALS = 100
 
-    bot_type = ListenerBot
+    bot_type = ListenerBotMk2
 
     board = Board(NUM_PLAYERS, STARTING_SEED, STARTING_PLAYER)
 

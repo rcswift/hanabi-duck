@@ -3,7 +3,7 @@ import logging
 
 from operator import and_, not_, or_, eq
 
-from hanabi import Board, CardInfo, Clue, Discard, Play, CARD_NUMBERS, CARD_COLORS
+from hanabi import Board, CardInfo, Clue, Discard, Play, CARD_NUMBERS, CARD_COLORS, MAX_CLUES
 
 class BaseBot():
     def __init__(self, board: Board, index: int):
@@ -161,14 +161,6 @@ class ClueBotMk3(BaseBot):
         logging.debug(f"Discarding card from position {chop}")
         return chop
 
-    def cards_touched(self, clue: Clue) -> List[bool]:
-        """Simulate a clue on a hand to check which cards are touched"""
-        hand = self.board.get_hand(clue.target)
-        if clue.number:
-            return [card.number == clue.number for card in hand]
-        elif clue.color:
-            return [card.color == clue.color for card in hand]
-
     def play(self) -> Turn:
         # Play clued cards
         for i, card_info in enumerate(self.board.current_info):
@@ -197,7 +189,7 @@ class ClueBotMk3(BaseBot):
             possible_clues = [Clue(target, number=number) for number in set(CARD_NUMBERS)] + [Clue(target, color=color) for color in set(CARD_COLORS)]
 
             for clue in possible_clues:
-                would_touch = self.cards_touched(clue)
+                would_touch = self.board.cards_touched(clue)
                 num_touch = sum(would_touch)
 
                 # Check that this clue touches only playable cards
@@ -226,6 +218,11 @@ class ListenerBot(BaseBot):
     The to_be_played property tracks the value for play clues that have been given.
     Decisions on wether or not a card is a player are still made based on cards that
     have actually been played, so there is no concern about order. 
+
+    Average score is 16.19. Pretty good. 
+
+    Areas for improvement:
+     - Use a more robust clue algorithm to avoid giving clues with extra information
     """
     def reset(self):
         self.to_be_played = {"r": 0, "y": 0, "g": 0, "b": 0, "p": 0}
@@ -243,14 +240,6 @@ class ListenerBot(BaseBot):
 
     def already_clued(self, card: Card) -> bool:
         return self.to_be_played[card.color] >= card.number
-
-    def cards_touched(self, clue: Clue) -> List[bool]:
-        """Simulate a clue on a hand to check which cards are touched"""
-        hand = self.board.get_hand(clue.target)
-        if clue.number:
-            return [card.number == clue.number for card in hand]
-        elif clue.color:
-            return [card.color == clue.color for card in hand]
 
     def play(self) -> Turn:
         logging.debug(f"to_be_played: {self.to_be_played}")
@@ -304,3 +293,93 @@ class ListenerBot(BaseBot):
                     if self.board.is_playable(card):
                         self.to_be_played[card.color] = card.number
                 
+class ListenerBotMk2(ListenerBot):
+    """
+    Further Refinements to 'ListenerBot'
+        First, try to play any clued cards
+                                                                                                                   
+        If no cards are clued, try to give a clue
+        Rules for clues:
+          1. A clue must not touch any non-playable cards
+          2. A clue must not touch any duplicate cards (either in the same hand, or already clued in another hand)
+          3. A clue must touch at least one playable card
+                                                                                                                   
+        If no clue meets the requirements, or there are no clues to give, discard.
+        If any cards were playable, they would have been played above so the chop must be the last card
+                                                                                                                   
+        If no discards are available at this point then we're guaranteed a strike. Play the newest card.
+          Alternatively, a zero-information (duplicate) clue could be given.
+
+        This bot averages ~16.67 with about a 0.5% perfect rate (4 Player).
+
+        Biggest problem here is the lack of save clues, if high cards show up early they get discarded. 
+
+        Another potential improvement would be to prefer to clue rather than play if another player with 0 clued
+        cards can be clued. This would stave off discards in some opportunities.
+    """
+    def play(self) -> Turn:
+        # Play clued cards
+        logging.debug(f"Current Information: {[card.clued for card in self.board.current_info]}")
+        for i, card_info in enumerate(self.board.current_info):
+            # Play cards from oldest to newest
+            if card_info.clued:
+                return Play(i)
+
+        # Give a clue
+        if self.board.clues > 0:
+            # Explore all possible clues:
+            valid_clues = []
+            valid_targets = []
+            for target in self.board.other_players:
+                target_hand = self.board.get_hand(target)
+                target_info = self.board.get_info(target)
+
+                target_playable = [self.board.is_playable(card) for card in target_hand]
+                target_clued = [card.clued for card in target_info]
+
+                possible_clues = [Clue(target, number=number) for number in set(CARD_NUMBERS)] + [Clue(target, color=color) for color in set(CARD_COLORS)]
+
+                for clue in possible_clues:
+                    clue_touched = self.board.cards_touched(clue)
+
+                    # A clue must touch at least one card
+                    if sum(clue_touched) == 0:
+                        continue
+
+                    # A clue must not touch any non-playable cards:
+                    if sum(list(map(and_, list(map(not_, target_playable)), clue_touched))) > 0:
+                        continue
+
+                    # A clue must not touch a card already clued in another players' hand:
+                    if sum(list(map(and_, list(map(self.already_clued, target_hand)), clue_touched))) > 0:
+                        continue
+
+                    # A clue must not touch multiple of the same card in the same hand:
+                    if max([target_hand.count(card) for idx, card in enumerate(target_hand) if clue_touched[idx]]) > 1:
+                        continue
+
+                    # If we've made it this far, the clue is valid:
+                    logging.debug(f"Valid Clue: {clue}")
+                    valid_clues.append(clue)
+                    if target not in valid_targets:
+                        valid_targets.append(target)
+
+            # If any valid clues were found, select one to play:
+            if valid_clues:
+                # Select the player with the least information
+                # 'sorted()' is stable w.r.t. the original order, so this sorts lowest-to-highest and preserves turn order.
+                clue_target = sorted([(target, sum([card.clued for card in self.board.get_info(target)])) for target in valid_targets], key=lambda x: x[1])[0][0]
+                logging.debug(f"Give Clue to Player {clue_target}")
+
+                # Of the remaining clues, pick the one that touches the most cards
+                return sorted([(clue, sum(self.board.cards_touched(clue))) for clue in valid_clues if clue.target == clue_target], key=lambda x: x[1], reverse=True)[0][0]
+
+        # Otherwise, Discard
+        if self.board.clues < MAX_CLUES:
+            # Oldest card. Any players will have been played. 
+            return Discard(self.board.current_hand_size-1)
+
+        # Couldn't Play. Couldn't Clue. Couldn't Discard. Nothing left to try. This is probably a strike.
+        return Play(0)
+
+
