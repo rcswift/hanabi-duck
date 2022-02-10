@@ -150,6 +150,13 @@ class Board:
            i.e. +1 for the next player, 0 for the current player, -1 for the previous player"""
         return (self.current_player + idx) % self.num_players
 
+    def cards_touched(self, clue: Clue) -> List[bool]:
+        """Returns a list of cards that will be touched by this clue"""
+        if clue.color:
+            return [card.color == clue.color for card in self.get_hand(clue.target)]
+        elif clue.number:
+            return [card.number == clue.number for card in self.get_hand(clue.target)]
+
     def evaluate(self, turn: Turn):
         """Processes the results of each players' turn"""
         if isinstance(turn, Clue):
