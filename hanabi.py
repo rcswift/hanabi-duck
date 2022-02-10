@@ -185,7 +185,7 @@ class Board:
             raise InvalidMove("no clues available")
 
         # Update Information
-        logging.info(f"Player {target} Old Information: {[str(x) for x in self._card_info[target]]}")
+        logging.debug(f"Player {target} Old Information: {[str(x) for x in self._card_info[target]]}")
         for idx, card in enumerate(self._hands[target]):
             if clue.color:
                 if card.color == clue.color:
@@ -202,7 +202,7 @@ class Board:
                     self._card_info[target][idx].clued = True
                 else:
                     self._card_info[target][idx].number.discard(clue.number)
-        logging.info(f"Player {target} New Information: {[str(x) for x in self._card_info[target]]}")
+        logging.debug(f"Player {target} New Information: {[str(x) for x in self._card_info[target]]}")
 
         self.clues -= 1
 
@@ -222,12 +222,12 @@ class Board:
             self.strikes += 1
 
         # Update information
-        logging.info(f"Player {self.current_player} Old Information: {[str(x) for x in self.current_info]}")
+        logging.debug(f"Player {self.current_player} Old Information: {[str(x) for x in self.current_info]}")
         self.current_info.pop(card.index)
 
         self._draw_card()
 
-        logging.info(f"Player {self.current_player} New Information: {[str(x) for x in self.current_info]}")
+        logging.debug(f"Player {self.current_player} New Information: {[str(x) for x in self.current_info]}")
 
     def _discard_turn(self, card: Discard):
         if self.clues == MAX_CLUES:
@@ -238,12 +238,12 @@ class Board:
         self.discarded_cards.append(discarded_card)
 
         # Update information
-        logging.info(f"Player {self.current_player} Old Information: {[str(x) for x in self.current_info]}")
+        logging.debug(f"Player {self.current_player} Old Information: {[str(x) for x in self.current_info]}")
         self.current_info.pop(card.index)
 
         self._draw_card()
 
-        logging.info(f"Player {self.current_player} New Information: {[str(x) for x in self.current_info]}")
+        logging.debug(f"Player {self.current_player} New Information: {[str(x) for x in self.current_info]}")
 
         self.clues += 1
 
