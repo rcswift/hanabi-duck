@@ -6,28 +6,21 @@ from operator import and_, not_, or_, eq
 from hanabi import Board, CardInfo, Clue, Discard, Play, CARD_NUMBERS, CARD_COLORS, MAX_CLUES
 
 class BaseBot():
-    def __init__(self, board: Board, index: int):
-        self.board = board
-        self.index = index
-
+    def __init__(self):
         self.reset()
 
     def reset(self):
         """Executed once at the start of the game"""
         pass
 
-    def play(self) -> Turn:
+    def play(self, board: Board) -> Turn:
         """Executed on my turn"""
         raise NotImplemented
-
-    def listen(self, player: int, turn: Turn) -> None:
-        """Executed after every turn"""
-        pass
 
 
 class DumbBot(BaseBot):
     """Dumb bot always plays the first card"""
-    def play(self) -> Turn:
+    def play(self, board: Board) -> Turn:
         return Play(0)
 
 class BasicCheatingBot(BaseBot):
@@ -37,47 +30,47 @@ class BasicCheatingBot(BaseBot):
 
     Its main problem is discarding 5s from the initial deal
     """
-    def play(self) -> Turn:
-        hand = self.board._hands[self.board.current_player]
-        for i, card in zip(range(self.board.current_hand_size - 1, -1, -1), reversed(hand)):
+    def play(self, board: Board) -> Turn:
+        hand = board._hands[board.current_player]
+        for i, card in zip(range(board.current_hand_size - 1, -1, -1), reversed(hand)):
 
-            if self.board.is_playable(card):
+            if board.is_playable(card):
                 return Play(i)
-        if self.board.clues == 0:
-            return Discard(self.board.current_hand_size - 1)
+        if board.clues == 0:
+            return Discard(board.current_hand_size - 1)
         else:
-            return Clue(target=self.board.relative_player(1), color="r") # Clue the next player red
+            return Clue(target=board.relative_player(1), color="r") # Clue the next player red
 
 class CheatingBot(BaseBot):
     """
     Improves on BasicCheatingBot by looking at the card it's going to discard and picking safe discards
     Its weakness is probably getting unlucky with draws and running out of turns
     """
-    def play(self) -> Turn:
-        hand = self.board._hands[self.board.current_player]
+    def play(self, board: Board) -> Turn:
+        hand = board._hands[board.current_player]
 
         # Play any playable cards. Neither ascending or descending order seem to help
         for i, card in enumerate(hand):
-            if self.board.is_playable(card):
+            if board.is_playable(card):
                 return Play(i)
 
         # Clue if we're close to max clues
-        if self.board.clues > 6:
-            return Clue(target=self.board.relative_player(1), color="r")
+        if board.clues > 6:
+            return Clue(target=board.relative_player(1), color="r")
 
         # Discard if we have freely discardable cards
         for i, card in enumerate(hand):
-            if self.board.is_discardable(card):
+            if board.is_discardable(card):
                 return Discard(i)
 
         # Clue if we have clues left
-        if self.board.clues > 0:
-            return Clue(target=self.board.relative_player(1), color="r")
+        if board.clues > 0:
+            return Clue(target=board.relative_player(1), color="r")
 
         # Discard any cards that don't need to be saved
         hand.sort(key=lambda x: x.number, reverse=True) # this discards 4 > 3 > 2, but barely helps
         for i, card in enumerate(hand):
-            if not self.board.is_unique(card):
+            if not board.is_unique(card):
                 return Discard(i)
 
         # Last resort, discard
@@ -86,45 +79,45 @@ class CheatingBot(BaseBot):
 
 class ClueBot(BaseBot):
     """Clues playable cards"""
-    def play(self) -> Turn:
+    def play(self, board: Board) -> Turn:
         # Play clued cards
-        for i, card_info in enumerate(self.board.current_info):
+        for i, card_info in enumerate(board.current_info):
             if card_info.clued:
                 return Play(i)
 
         # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
-        if self.board.clues == 0:
-            return Discard(self.board.current_hand_size - 1)
+        if board.clues == 0:
+            return Discard(board.current_hand_size - 1)
 
         # Clue playable cards
-        for player_idx, hand in self.board.visible_hands:
+        for player_idx, hand in board.visible_hands:
             for j, card in enumerate(hand):
-                if self.board.is_playable(card):
+                if board.is_playable(card):
                     return Clue(target=player_idx, color=card.color) # todo: pick the least ambiguous target
 
         # Otherwise discard last card
-        if self.board.clues >= 7:
-            return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
-        return Discard(self.board.current_hand_size - 1)
+        if board.clues >= 7:
+            return Clue(target=board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
+        return Discard(board.current_hand_size - 1)
 
 class ClueBotImproved(BaseBot):
     """Prioritizes clues based on turn order"""
     
-    def play(self) -> Turn:
+    def play(self, board: Board) -> Turn:
         # Play clued cards
-        for i, card_info in enumerate(self.board.current_info):
+        for i, card_info in enumerate(board.current_info):
             # Play cards from right to left
             if card_info.clued:
                 return Play(i)
 
         # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
-        if self.board.clues == 0:
-            return Discard(self.board.current_hand_size - 1)
+        if board.clues == 0:
+            return Discard(board.current_hand_size - 1)
 
         # Clue playable cards in order of preference:
-        for player_idx, hand in self.board.visible_hands:
+        for player_idx, hand in board.visible_hands:
             for card_idx, card in enumerate(hand):
-                if self.board.is_playable(card) and not self.board.get_info(player_idx)[card_idx].clued:
+                if board.is_playable(card) and not board.get_info(player_idx)[card_idx].clued:
                     # Decide if Number or Color is better:
                     cards_touched_by_number = sum([c.number == card.number for c in hand])
                     cards_touched_by_color = sum([c.color == card.color for c in hand])
@@ -135,9 +128,9 @@ class ClueBotImproved(BaseBot):
                         return Clue(player_idx, color=card.color)
 
         # Otherwise discard last card
-        if self.board.clues >= 7:
-            return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
-        return Discard(self.board.current_hand_size - 1)
+        if board.clues >= 7:
+            return Clue(target=board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
+        return Discard(board.current_hand_size - 1)
     
 class ClueBotMk3(BaseBot):
     """
@@ -153,7 +146,7 @@ class ClueBotMk3(BaseBot):
     @property
     def chop(self) -> int:
         """Return the index of the highest un-clued card"""
-        non_clued_cards = [idx for idx, info in enumerate(self.board.current_info) if not info.clued]
+        non_clued_cards = [idx for idx, info in enumerate(board.current_info) if not info.clued]
         if len(non_clued_cards) == 0:
             chop = 0
         else:
@@ -161,35 +154,35 @@ class ClueBotMk3(BaseBot):
         logging.debug(f"Discarding card from position {chop}")
         return chop
 
-    def play(self) -> Turn:
+    def play(self, board: Board) -> Turn:
         # Play clued cards
-        for i, card_info in enumerate(self.board.current_info):
+        for i, card_info in enumerate(board.current_info):
             # Play cards from right to left
             if card_info.clued:
                 return Play(i)
 
         # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
-        if self.board.clues == 0:
+        if board.clues == 0:
             return Discard(self.chop)
 
         good_clues = []
 
         # Scan all possible clues:
-        for player_offset in range(1,self.board.num_players):
-            target = self.board.relative_player(player_offset)
+        for player_offset in range(1,board.num_players):
+            target = board.relative_player(player_offset)
              # The hand that this potential clue would target
-            hand = self.board.get_hand(target)
+            hand = board.get_hand(target)
             # The cards that are immediately playable from this hand
-            playable = list(map(self.board.is_playable, hand))
+            playable = list(map(board.is_playable, hand))
             # The cards that have not yet been clued
-            not_clued = [not info.clued for info in self.board.get_info(target)]
+            not_clued = [not info.clued for info in board.get_info(target)]
 
             should_touch = list(map(and_, playable, not_clued))
 
             possible_clues = [Clue(target, number=number) for number in set(CARD_NUMBERS)] + [Clue(target, color=color) for color in set(CARD_COLORS)]
 
             for clue in possible_clues:
-                would_touch = self.board.cards_touched(clue)
+                would_touch = board.cards_touched(clue)
                 num_touch = sum(would_touch)
 
                 # Check that this clue touches only playable cards
@@ -207,8 +200,8 @@ class ClueBotMk3(BaseBot):
             return good_clues[0][0]
         else:
             # Otherwise discard last card
-            if self.board.clues >= 7:
-                return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
+            if board.clues >= 7:
+                return Clue(target=board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
             return Discard(self.chop)
 
 class ListenerBot(BaseBot):
@@ -230,7 +223,7 @@ class ListenerBot(BaseBot):
     @property
     def chop(self) -> int:
         """Return the index of the highest un-clued card"""
-        non_clued_cards = [idx for idx, info in enumerate(self.board.current_info) if not info.clued]
+        non_clued_cards = [idx for idx, info in enumerate(board.current_info) if not info.clued]
         if len(non_clued_cards) == 0:
             chop = 0
         else:
@@ -241,24 +234,24 @@ class ListenerBot(BaseBot):
     def already_clued(self, card: Card) -> bool:
         return self.to_be_played[card.color] >= card.number
 
-    def play(self) -> Turn:
+    def play(self, board: Board) -> Turn:
         logging.debug(f"to_be_played: {self.to_be_played}")
         # Play clued cards
-        for i, card_info in enumerate(self.board.current_info):
+        for i, card_info in enumerate(board.current_info):
             # Play cards from right to left
             if card_info.clued:
                 return Play(i)
 
         # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
-        if self.board.clues == 0:
+        if board.clues == 0:
             return Discard(self.chop)
 
-        for target in self.board.other_players:
+        for target in board.other_players:
             # The hand that this potential clue would target
-            hand = self.board.get_hand(target)
+            hand = board.get_hand(target)
 
             for card in hand:
-                if self.board.is_playable(card) and not self.already_clued(card):
+                if board.is_playable(card) and not self.already_clued(card):
                     # Decide if Number or Color is better:
                     cards_touched_by_number = sum([c.number == card.number for c in hand])
                     cards_touched_by_color = sum([c.color == card.color for c in hand])
@@ -269,8 +262,8 @@ class ListenerBot(BaseBot):
                         return Clue(target, color=card.color)
 
         # Otherwise discard last card
-        if self.board.clues >= 7:
-            return Clue(target=self.board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
+        if board.clues >= 7:
+            return Clue(target=board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
         return Discard(self.chop)
                     
 
@@ -280,7 +273,7 @@ class ListenerBot(BaseBot):
         if isinstance(turn, Clue):
             logging.debug(f"Bot {self.index} Heard Clue from Player {player}: {turn}")
             if self.index != turn.target:
-                hand = self.board.get_hand(turn.target)
+                hand = board.get_hand(turn.target)
 
                 cards_clued = []
 
@@ -290,7 +283,7 @@ class ListenerBot(BaseBot):
                     cards_clued = [card for card in hand if card.color == turn.color]
 
                 for card in cards_clued:
-                    if self.board.is_playable(card):
+                    if board.is_playable(card):
                         self.to_be_played[card.color] = card.number
                 
 class ListenerBotMk2(ListenerBot):
@@ -319,28 +312,28 @@ class ListenerBotMk2(ListenerBot):
     """
     def play(self) -> Turn:
         # Play clued cards
-        logging.debug(f"Current Information: {[card.clued for card in self.board.current_info]}")
-        for i, card_info in enumerate(self.board.current_info):
+        logging.debug(f"Current Information: {[card.clued for card in board.current_info]}")
+        for i, card_info in enumerate(board.current_info):
             # Play cards from oldest to newest
             if card_info.clued:
                 return Play(i)
 
         # Give a clue
-        if self.board.clues > 0:
+        if board.clues > 0:
             # Explore all possible clues:
             valid_clues = []
             valid_targets = []
-            for target in self.board.other_players:
-                target_hand = self.board.get_hand(target)
-                target_info = self.board.get_info(target)
+            for target in board.other_players:
+                target_hand = board.get_hand(target)
+                target_info = board.get_info(target)
 
-                target_playable = [self.board.is_playable(card) for card in target_hand]
+                target_playable = [board.is_playable(card) for card in target_hand]
                 target_clued = [card.clued for card in target_info]
 
                 possible_clues = [Clue(target, number=number) for number in set(CARD_NUMBERS)] + [Clue(target, color=color) for color in set(CARD_COLORS)]
 
                 for clue in possible_clues:
-                    clue_touched = self.board.cards_touched(clue)
+                    clue_touched = board.cards_touched(clue)
 
                     # A clue must touch at least one card
                     if sum(clue_touched) == 0:
@@ -368,16 +361,16 @@ class ListenerBotMk2(ListenerBot):
             if valid_clues:
                 # Select the player with the least information
                 # 'sorted()' is stable w.r.t. the original order, so this sorts lowest-to-highest and preserves turn order.
-                clue_target = sorted([(target, sum([card.clued for card in self.board.get_info(target)])) for target in valid_targets], key=lambda x: x[1])[0][0]
+                clue_target = sorted([(target, sum([card.clued for card in board.get_info(target)])) for target in valid_targets], key=lambda x: x[1])[0][0]
                 logging.debug(f"Give Clue to Player {clue_target}")
 
                 # Of the remaining clues, pick the one that touches the most cards
-                return sorted([(clue, sum(self.board.cards_touched(clue))) for clue in valid_clues if clue.target == clue_target], key=lambda x: x[1], reverse=True)[0][0]
+                return sorted([(clue, sum(board.cards_touched(clue))) for clue in valid_clues if clue.target == clue_target], key=lambda x: x[1], reverse=True)[0][0]
 
         # Otherwise, Discard
-        if self.board.clues < MAX_CLUES:
+        if board.clues < MAX_CLUES:
             # Oldest card. Any players will have been played. 
-            return Discard(self.board.current_hand_size-1)
+            return Discard(board.current_hand_size-1)
 
         # Couldn't Play. Couldn't Clue. Couldn't Discard. Nothing left to try. This is probably a strike.
         return Play(0)

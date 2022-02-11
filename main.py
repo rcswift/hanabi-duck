@@ -12,13 +12,8 @@ def run(board: Board, bots: List[BaseBot]):
 
     while not board.game_over:
         logging.info(str(board))
-
-        player = board.current_player
-        turn = bots[player].play()
-        for bot in bots:
-            bot.listen(player, turn)
+        turn = bots[board.current_player].play(board)
         board.evaluate(turn)
-
 
     logging.warning(f"Game is complete with a score of {board.score}")
     return board.score
@@ -43,11 +38,11 @@ if __name__ == "__main__":
     STARTING_PLAYER = 0
     TRIALS = 100
 
-    bot_type = ListenerBotMk2
+    bot_type = CheatingBot
 
     board = Board(NUM_PLAYERS, STARTING_SEED, STARTING_PLAYER)
 
-    bots = [bot_type(board, i) for i in range(NUM_PLAYERS)]
+    bots = [bot_type() for _ in range(NUM_PLAYERS)]
 
     scores = score_bot(board, bots, TRIALS, STARTING_SEED)
 
