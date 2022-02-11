@@ -3,7 +3,7 @@ import logging
 
 from operator import and_, not_, or_, eq
 
-from hanabi import Board, CardInfo, Clue, Discard, Play, CARD_NUMBERS, CARD_COLORS, MAX_CLUES
+from hanabi import Board, CardInfo, Clue, Discard, Play
 
 class BaseBot():
     def __init__(self):
@@ -143,8 +143,7 @@ class ClueBotMk3(BaseBot):
 
     Average score is about 12 points. 
     """
-    @property
-    def chop(self) -> int:
+    def chop(self, board) -> int:
         """Return the index of the highest un-clued card"""
         non_clued_cards = [idx for idx, info in enumerate(board.current_info) if not info.clued]
         if len(non_clued_cards) == 0:
@@ -163,7 +162,7 @@ class ClueBotMk3(BaseBot):
 
         # If out of clues, discard last card (card will never be clued because we play clued cards in prev step)
         if board.clues == 0:
-            return Discard(self.chop)
+            return Discard(self.chop(board))
 
         good_clues = []
 
@@ -179,7 +178,7 @@ class ClueBotMk3(BaseBot):
 
             should_touch = list(map(and_, playable, not_clued))
 
-            possible_clues = [Clue(target, number=number) for number in set(CARD_NUMBERS)] + [Clue(target, color=color) for color in set(CARD_COLORS)]
+            possible_clues = [Clue(target, number=number) for number in set(board.variant.CARD_NUMBERS)] + [Clue(target, color=color) for color in set(board.variant.CARD_COLORS)]
 
             for clue in possible_clues:
                 would_touch = board.cards_touched(clue)
@@ -202,7 +201,7 @@ class ClueBotMk3(BaseBot):
             # Otherwise discard last card
             if board.clues >= 7:
                 return Clue(target=board.relative_player(1), color="r") # throwaway clue. this is technically not allowed
-            return Discard(self.chop)
+            return Discard(self.chop(board))
 
 class ListenerBot(BaseBot):
     """

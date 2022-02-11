@@ -4,7 +4,7 @@ from typing import List
 from bot import *
 from hanabi import Board
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.ERROR)
 # I misuse logging here. Debug is for debugging, info is for watching a single game, warning is for many runs of the bot
 
 def run(board: Board, bots: List[BaseBot]):
@@ -38,15 +38,16 @@ if __name__ == "__main__":
     STARTING_PLAYER = 0
     TRIALS = 100
 
-    bot_type = CheatingBot
+    bot_types = [DumbBot, ClueBot, ClueBotImproved, ClueBotMk3, BasicCheatingBot, CheatingBot]
 
-    board = Board(NUM_PLAYERS, STARTING_SEED, STARTING_PLAYER)
+    for bot_type in bot_types:
+        board = Board(NUM_PLAYERS, STARTING_SEED, STARTING_PLAYER)
 
-    bots = [bot_type() for _ in range(NUM_PLAYERS)]
+        bots = [bot_type() for _ in range(NUM_PLAYERS)]
 
-    scores = score_bot(board, bots, TRIALS, STARTING_SEED)
+        scores = score_bot(board, bots, TRIALS, STARTING_SEED)
 
-    final_result = (f"Bot {bot_type.__name__} completed {len(scores)} trials with an average score of {sum(scores) / len(scores)} " +
-        f"(max: {max(scores)}, min: {min(scores)}, {scores.count(25)} perfect)")
-    logging.warning(final_result)
-    print(final_result)
+        final_result = (f"Bot {bot_type.__name__} completed {len(scores)} trials with an average score of {sum(scores) / len(scores)} " +
+            f"(max: {max(scores)}, min: {min(scores)}, {scores.count(25)} perfect)")
+        logging.warning(final_result)
+        print(final_result)

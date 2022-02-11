@@ -1,12 +1,8 @@
 from dataclasses import dataclass, field
 import logging
 from textwrap import dedent, indent
-from typing import List, Union, Tuple, Set
+from typing import List, Union, Tuple, Set, Dict
 import random
-
-CARD_COLORS = ["r", "y", "g", "b", "p"]
-CARD_NUMBERS = [1, 1, 1, 2, 2, 3, 3, 4, 4, 5]
-CARD_COUNT = {i: CARD_NUMBERS.count(i) for i in set(CARD_NUMBERS)}
 
 MAX_CLUES = 8
 
@@ -40,8 +36,8 @@ class Card:
 @dataclass
 class CardInfo:
     # This syntax is required to initialize each new CardInfo object with a COPY of the constant values
-    color: Set[str] = field(default_factory=lambda: set(CARD_COLORS))
-    number: Set[int] = field(default_factory=lambda: set(CARD_NUMBERS))
+    color: Set[str]
+    number: Set[int] 
     clued: bool = False
 
     def __str__(self):
@@ -50,9 +46,97 @@ class CardInfo:
 class InvalidMove(Exception):
     pass
 
+class VariantBase:
+    """
+    The variant class implements the rules for cluing and touching cards as well as
+    defining the initial contents of the deck. 
+
+    All methods in this class are @classmethods. An instance of this class should 
+    not need to be created. 
+    """
+    @classmethod
+    def clue_touched(self, card: Card, clue: Clue) -> bool:
+        """Return 'True' if the given clue touches the given card"""
+        raise NotImplemented
+
+    @classmethod
+    def update_info(self, card_info: CardInfo, clue: Clue, touched: bool) -> None:
+        """Update the given CardInfo struct based on if the given clue touched the corresponding card"""
+        raise NotImplemented
+
+    CARD_COLORS : List[str] = []
+    CARD_NUMBERS : List[int] = []
+
+
+class VariantDefault(VariantBase):
+    @classmethod
+    def clue_touched(self, card: Card, clue: Clue) -> bool:
+        return (card.color == clue.color or card.number == clue.number)
+
+    @classmethod
+    def update_info(self, card_info: CardInfo, clue: Clue, touched: bool) -> None:
+        if touched:
+            card_info.clued = True
+
+        if clue.color:
+            if touched:
+                for color in set(self.CARD_COLORS):
+                    if not color == clue.color:
+                        card_info.color.discard(color)
+            else:
+                card_info.color.discard(clue.color)
+
+        if clue.number:
+            if touched:
+                for number in set(self.CARD_NUMBERS):
+                    if not number == clue.number:
+                        card_info.number.discard(number)
+            else:
+                card_info.number.discard(clue.number)
+
+    CARD_COLORS  : List[str] = ["r", "y", "g", "b", "p"]
+    CARD_NUMBERS : List[int] = [1, 1, 1, 2, 2, 3, 3, 4, 4, 5]
+
+class VariantRainbow(VariantDefault):
+    @classmethod
+    def clue_touched(self, card: Card, clue: Clue) -> bool:
+        if clue.color == "m":
+            raise InvalidMove("cannot clue rainbow suit 'm'")
+        return (card.color == clue.color or card.color == "m" or card.number == clue.number)
+
+    @classmethod
+    def update_info(self, card_info: CardInfo, clue: Clue, touched: bool) -> None:
+        if touched:
+            card_info.clued = True
+
+        if clue.color:
+            if touched:
+                for color in set(self.CARD_COLORS):
+                    if not (color == clue.color or color == "m"):
+                        card_info.color.discard(color)
+            else:
+                card_info.color.discard(clue.color)
+
+        if clue.number:
+            if touched:
+                for number in set(self.CARD_NUMBERS):
+                    if not number == clue.number:
+                        card_info.number.discard(number)
+            else:
+                card_info.number.discard(clue.number)
+        
+    CARD_COLORS : List[str] = ["r", "y", "g", "b", "p", "m"]
+
+class VariantDuck(VariantDefault):
+    @classmethod
+    def update_info(self, card_info: CardInfo, clue: Clue, touched: bool) -> None:
+        if touched:
+            card_info.clued = True
+    
 class Board:
-    def __init__(self, num_players, seed=None, starting_player=0):
+    def __init__(self, num_players, seed=None, starting_player=0, variant=VariantDefault):
         self.num_players = num_players
+        self.variant = variant
 
         self.reset(seed, starting_player)
 
@@ -68,7 +152,7 @@ class Board:
 
         ### Hidden attributes. DO NOT ACCESS THESE ATTRIBUTES IN YOUR BOT ###
         self._card_info: List[List[CardInfo]] = [[] for _ in range(self.num_players)]
-        self._deck: List[Card] = [Card(c, n) for c in CARD_COLORS for n in CARD_NUMBERS]
+        self._deck: List[Card] = [Card(c, n) for c in self.variant.CARD_COLORS for n in self.variant.CARD_NUMBERS]
         random.seed(seed)
         random.shuffle(self._deck)
 
@@ -143,19 +227,20 @@ class Board:
 
     def is_unique(self, card: Card) -> bool:
         """does a card need to be saved? these cards have a red exclamation point in the web version"""
-        return (CARD_COUNT[card.number] - self.discarded_cards.count(card)) == 1
+        return (self.variant.CARD_NUMBERS.count([card.number]) - self.discarded_cards.count(card)) == 1
 
     def relative_player(self, idx: int) -> int:
         """Returns the absolute index of a player relative to the current player 
            i.e. +1 for the next player, 0 for the current player, -1 for the previous player"""
         return (self.current_player + idx) % self.num_players
 
+    def clue_touched(self, card: Card, clue: Clue) -> bool:
+        """Checks if a given card is touched by a given clue"""
+        return self.variant.clue_touched(card, clue)
+
     def cards_touched(self, clue: Clue) -> List[bool]:
         """Returns a list of cards that will be touched by this clue"""
-        if clue.color:
-            return [card.color == clue.color for card in self.get_hand(clue.target)]
-        elif clue.number:
-            return [card.number == clue.number for card in self.get_hand(clue.target)]
+        return [self.clue_touched(card, clue) for card in self.get_hand(clue.target)]
 
     def evaluate(self, turn: Turn):
         """Processes the results of each players' turn"""
@@ -193,22 +278,10 @@ class Board:
 
         # Update Information
         logging.debug(f"Player {target} Old Information: {[str(x) for x in self._card_info[target]]}")
-        for idx, card in enumerate(self._hands[target]):
-            if clue.color:
-                if card.color == clue.color:
-                    self._card_info[target][idx].color.clear()
-                    self._card_info[target][idx].color.add(clue.color)
-                    self._card_info[target][idx].clued = True
-                else:
-                    self._card_info[target][idx].color.discard(clue.color)
 
-            if clue.number:
-                if card.number == clue.number:
-                    self._card_info[target][idx].number.clear()
-                    self._card_info[target][idx].number.add(clue.number)
-                    self._card_info[target][idx].clued = True
-                else:
-                    self._card_info[target][idx].number.discard(clue.number)
+        for card, card_info in zip(self._hands[target], self._card_info[target]):
+            self.variant.update_info(card_info, clue, self.variant.clue_touched(card, clue))
+
         logging.debug(f"Player {target} New Information: {[str(x) for x in self._card_info[target]]}")
 
         self.clues -= 1
@@ -261,7 +334,7 @@ class Board:
             new_card = self._deck.pop()
             player = index if index is not None else self.current_player
             self._hands[player].insert(0, new_card)
-            self._card_info[player].insert(0, CardInfo())
+            self._card_info[player].insert(0, CardInfo(set(self.variant.CARD_COLORS), set(self.variant.CARD_NUMBERS)))
         else:
             if self.turns_left is None:
                 self.turns_left = self.num_players + 1
