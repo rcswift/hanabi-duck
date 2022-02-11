@@ -4,7 +4,6 @@ from textwrap import dedent, indent
 from typing import List, Union, Tuple, Set, Dict
 import random
 
-MAX_CLUES = 8
 
 # Turn
 @dataclass
@@ -134,6 +133,8 @@ class VariantDuck(VariantDefault):
             card_info.clued = True
     
 class Board:
+    MAX_CLUES = 8
+
     def __init__(self, num_players, seed=None, starting_player=0, variant=VariantDefault):
         self.num_players = num_players
         self.variant = variant
@@ -148,7 +149,7 @@ class Board:
         self.turn_index = 0
         self.turns_left: Optional[int] = None # None until the deck is exhausted, then counts down to 0
         self.strikes = 0
-        self.clues = MAX_CLUES
+        self.clues = Board.MAX_CLUES
 
         ### Hidden attributes. DO NOT ACCESS THESE ATTRIBUTES IN YOUR BOT ###
         self._card_info: List[List[CardInfo]] = [[] for _ in range(self.num_players)]
@@ -295,7 +296,7 @@ class Board:
 
             if played_card.number == 5:
                 self.clues += 1
-                self.clues = max(self.clues, MAX_CLUES)
+                self.clues = max(self.clues, Board.MAX_CLUES)
         else:
             logging.info(f"Player {self.current_player} tried to play from slot {card.index}, {str(played_card)}")
             self.discarded_cards.append(played_card)
@@ -310,7 +311,7 @@ class Board:
         logging.debug(f"Player {self.current_player} New Information: {[str(x) for x in self.current_info]}")
 
     def _discard_turn(self, card: Discard):
-        if self.clues == MAX_CLUES:
+        if self.clues == Board.MAX_CLUES:
             logging.warning("Cannot discard at max clues")
             raise InvalidMove("cannot discard at max clues")
         discarded_card = self._current_hand.pop(card.index)

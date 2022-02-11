@@ -2,7 +2,7 @@ import logging
 from typing import List
 
 from bot import *
-from hanabi import Board
+from hanabi import Board, VariantDuck
 
 logging.basicConfig(level=logging.ERROR)
 # I misuse logging here. Debug is for debugging, info is for watching a single game, warning is for many runs of the bot
@@ -38,10 +38,10 @@ if __name__ == "__main__":
     STARTING_PLAYER = 0
     TRIALS = 100
 
-    bot_types = [DumbBot, ClueBot, ClueBotImproved, ClueBotMk3, BasicCheatingBot, CheatingBot]
+    bot_types = [DumbBot, ClueBot, ClueBotImproved, ClueBotMk3, ClueBotAdvanced, BasicCheatingBot, CheatingBot]
 
     for bot_type in bot_types:
-        board = Board(NUM_PLAYERS, STARTING_SEED, STARTING_PLAYER)
+        board = Board(NUM_PLAYERS, STARTING_SEED, STARTING_PLAYER, variant=VariantDuck)
 
         bots = [bot_type() for _ in range(NUM_PLAYERS)]
 
