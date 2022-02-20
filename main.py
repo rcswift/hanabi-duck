@@ -38,7 +38,7 @@ if __name__ == "__main__":
     STARTING_PLAYER = 0
     TRIALS = 100
 
-    bot_types = [DumbBot, ClueBot, ClueBotImproved, ClueBotMk3, ClueBotAdvanced, BasicCheatingBot, CheatingBot]
+    bot_types = [DumbBot, ClueBot, ClueBotImproved, ClueBotMk3, ClueBotAdvanced, BasicCheatingBot, CheatingBot, LookaheadBot]
 
     for bot_type in bot_types:
         board = Board(NUM_PLAYERS, STARTING_SEED, STARTING_PLAYER, variant=VariantDuck)
