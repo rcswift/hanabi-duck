@@ -139,6 +139,8 @@ class Board:
         self.num_players = num_players
         self.variant = variant
 
+        self._rng = random.Random(0)
+
         self.reset(seed, starting_player)
 
     def reset(self, seed=None, starting_player=0):
@@ -154,8 +156,8 @@ class Board:
         ### Hidden attributes. DO NOT ACCESS THESE ATTRIBUTES IN YOUR BOT ###
         self._card_info: List[List[CardInfo]] = [[] for _ in range(self.num_players)]
         self._deck: List[Card] = [Card(c, n) for c in self.variant.CARD_COLORS for n in self.variant.CARD_NUMBERS]
-        random.seed(seed)
-        random.shuffle(self._deck)
+        self._rng.seed(seed)
+        self._rng.shuffle(self._deck)
 
         self._hands: List[List[Card]] = [[] for i in range(self.num_players)]
         for i in range(self.num_players):
