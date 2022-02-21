@@ -1,1 +1,1 @@
-from .hanabi import Board, CardInfo, Clue, Discard, Play, Turn, VariantDuck
+from .hanabi import Board, CardInfo, Clue, Discard, Play, Turn, VariantDuck, VariantDefault, VariantRainbow
