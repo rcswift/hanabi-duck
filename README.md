@@ -31,7 +31,7 @@ Scores are average of seeds 0-99 and are out of 25.
 - ClueBotImproved (12.36): Avoids giving clues that have already been given and selects between color & number based on which touches fewer additional card.
 - ClueBotMk3 (12.01): Explores all possible clues to try and find the most optimal
 - ClueBotAdvanced (16.30) : Explores all possible clues and identifies all valid clues, then gives a clue to the player with the least information.
-- LookaheadBot (16.38) : Predicts if other players will play on their turn and gives clues based on how those plays will change the possible playable cards.
+- LookaheadBot (17.04) : Predicts if other players will play on their turn and gives clues based on how those plays will change the possible playable cards.
 
 Cheating bots: These bots access their own hands.
 

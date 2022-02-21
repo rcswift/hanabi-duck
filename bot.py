@@ -315,7 +315,7 @@ class LookaheadBot(BaseBot):
     For sanity, this 'lookahead' process will only cover each other players next turn, since
     other players could choose to give us information and we can't predict that. 
 
-    The average score for this bot is 16.38. Slightly better than ClueBotAdvanced.
+    The average score for this bot is 17.04.
     """
 
     def _is_hypothetical_playable(self, card: Card, played_cards: Dict[str][int]) -> bool:
@@ -360,6 +360,7 @@ class LookaheadBot(BaseBot):
                     # Follow the rules set out in 'ClueBotAdvanced'
                     clued_cards = ClueBotAdvanced.get_clued_cards(board)
                     possible_clues = [Clue(player, number=number) for number in set(board.variant.CARD_NUMBERS)] + [Clue(player, color=color) for color in set(board.variant.CARD_COLORS)]
+                    valid_clues = []
 
                     for clue in possible_clues:
                         clue_touched = board.cards_touched(clue)
@@ -380,10 +381,18 @@ class LookaheadBot(BaseBot):
                         if max([player_hand.count(card) for idx, card in enumerate(player_hand) if clue_touched[idx]]) > 1:
                             continue
 
-                        # If we've made it this far, give the clue:
-                        return(clue)
+                        # If we've made it this far, the clue is valid.
+                        # Record the number of cards touched to prefer giving clues with more information.
+                        valid_clues.append((sum(clue_touched), clue))
 
-                    logging.debug(f"Player {player} has no valid clues")
+
+                    if valid_clues:
+                        # Sort the list on the first element (low to high)
+                        valid_clues.sort(key=lambda x: x[0])
+                        # Pick the last clue in the list (prefering clues with more information)
+                        return valid_clues[-1][1]
+                    else:
+                        logging.debug(f"Player {player} has no valid clues")
 
         # In this case there are no clues to give. Discard.
         if board.clues < board.MAX_CLUES:
