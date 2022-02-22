@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from bot import *
+from hanabi.bots import *
 from hanabi import Board, VariantDuck
 
 logging.basicConfig(level=logging.ERROR)
