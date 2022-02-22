@@ -318,79 +318,101 @@ class LookaheadBot(BaseBot):
     The average score for this bot is 17.04.
     """
 
-    def _is_hypothetical_playable(self, card: Card, played_cards: Dict[str][int]) -> bool:
-        return played_cards[card.color] == card.number-1
+    def reset(self):
+        self.future_cards = {}
 
-    def play(self, board: Board) -> Turn:
-        # If we have a clued card, play it immediately. 
-        for i, card_info in reversed(list(enumerate(board.current_info))):
-            # Play cards from oldest to newest
+    def _play_card(self, board: Board, player: int) -> Optional[Play]:
+        """
+        Check a given players hand for clued cards, return the corresponding 'Play' turn object
+        or 'None' if no cards are clued to be played.
+
+        This method works for board.current_player as well as any of board.other_players
+        """
+        player_info = board.get_info(player)
+        
+        for i, card_info in reversed(list(enumerate(board.get_info(player)))):
             if card_info.clued:
                 return Play(i)
 
-        # Grab a copy of the currently played cards
-        future_cards = {}
-        for color, number in board.played_cards.items():
-            future_cards[color] = number
+        return None
 
-        # Give a clue, if we can
+    def _hypothetical_play(self, card: Card) -> None:
+        if self._is_hypothetical_playable(card):
+            self.future_cards[card.color] == card.number
+
+    def _is_hypothetical_playable(self, card: Card) -> bool:
+        return self.future_cards[card.color] == card.number-1
+
+    def _get_valid_clues(self, board: Board, player: int) -> List[Clue]:
+        """
+        Get a list of all valid clues that could be given to the specified player.
+
+        Use the 'hypothetical' playable methods, rather than the board's playable methods 
+        to make decisions about if a card can be played or not.
+        """
+        player_hand = board.get_hand(player)
+        clued_cards = ClueBotAdvanced.get_clued_cards(board)
+        possible_clues = [Clue(player, number=number) for number in set(board.variant.CARD_NUMBERS)] + [Clue(player, color=color) for color in set(board.variant.CARD_COLORS)]
+        valid_clues = []
+
+        for clue in possible_clues:
+            clue_touched = board.cards_touched(clue)
+
+            # A clue must touch at least one card
+            if sum(clue_touched) == 0:
+                continue
+
+            # A clue must not touch any non-(hypothetically)-playable cards:
+            if sum([(not self._is_hypothetical_playable(card)) for idx, card in enumerate(player_hand) if clue_touched[idx]]) > 0:
+                continue
+
+            # A clue must not touch a card already clued in another players' hand:
+            if sum([(card in clued_cards) for idx, card in enumerate(player_hand) if clue_touched[idx]]) > 0:
+                continue
+
+            # A clue must not touch multiple of the same card in the same hand:
+            if max([player_hand.count(card) for idx, card in enumerate(player_hand) if clue_touched[idx]]) > 1:
+                continue
+
+            # If we've made it this far, the clue is valid.
+            # Record the number of cards touched to prefer giving clues with more information.
+            valid_clues.append(clue)
+
+        return valid_clues
+
+
+    def play(self, board: Board) -> Turn:
+        # If we have a clued card, play it immediately. 
+        play_action = self._play_card(board, board.current_player)
+        if play_action:
+            return play_action
+
+        # Otherwise, try to give a clue:
         if board.clues > 0:
+
+            # Grab a copy of the currently played cards
+            self.future_cards = board.played_cards.copy()
+
             # Decide if a player will play on their turn
             for player in board.other_players:
-                player_info = board.get_info(player)
-                player_hand = board.get_hand(player)
 
-                will_play = bool([info.clued for info in player_info].count(True))
+                # Check if the player will play using the same logic we use.
+                player_play_action = self._play_card(board, player)
 
-                if will_play:
-                    # Decide which card they will play, and add it to the hypothetical board state
-                    for i, card_info in reversed(list(enumerate(player_info))):
-                        # Play cards from oldest to newest
-                        if card_info.clued:
-                            # Add this card to the hypothetical board state
-                            card = player_hand[i]
-                            logging.debug(f"Player {player} will play card {i}: {card} on their turn")
-                            if self._is_hypothetical_playable(card, future_cards):
-                                future_cards[card.color] = card.number
-                            else:
-                                logging.debug(f"Player {player} is about to make a mistake!")
-                            break
+                if player_play_action:
+                    card = board.get_hand(player)[player_play_action.index]
+                    logging.debug(f"Player {player} will play card {player_play_action.index}: {str(card)} on their turn")
+                    self._hypothetical_play(card)
                 else:
-                    # This player has no cards currently clued. See if we can give them a clue. 
-                    # Follow the rules set out in 'ClueBotAdvanced'
-                    clued_cards = ClueBotAdvanced.get_clued_cards(board)
-                    possible_clues = [Clue(player, number=number) for number in set(board.variant.CARD_NUMBERS)] + [Clue(player, color=color) for color in set(board.variant.CARD_COLORS)]
-                    valid_clues = []
+                    player_valid_clues = self._get_valid_clues(board, player)
 
-                    for clue in possible_clues:
-                        clue_touched = board.cards_touched(clue)
-
-                        # A clue must touch at least one card
-                        if sum(clue_touched) == 0:
-                            continue
-
-                        # A clue must not touch any non-(hypothetically)-playable cards:
-                        if sum([(not self._is_hypothetical_playable(card, future_cards)) for idx, card in enumerate(player_hand) if clue_touched[idx]]) > 0:
-                            continue
-
-                        # A clue must not touch a card already clued in another players' hand:
-                        if sum([(card in clued_cards) for idx, card in enumerate(player_hand) if clue_touched[idx]]) > 0:
-                            continue
-
-                        # A clue must not touch multiple of the same card in the same hand:
-                        if max([player_hand.count(card) for idx, card in enumerate(player_hand) if clue_touched[idx]]) > 1:
-                            continue
-
-                        # If we've made it this far, the clue is valid.
-                        # Record the number of cards touched to prefer giving clues with more information.
-                        valid_clues.append((sum(clue_touched), clue))
-
-
-                    if valid_clues:
+                    if player_valid_clues:
+                        # Assess each valid clue on the basis of how many cards are touched:
+                        player_valid_clues = [(sum(board.cards_touched(clue)), clue) for clue in player_valid_clues]
                         # Sort the list on the first element (low to high)
-                        valid_clues.sort(key=lambda x: x[0])
+                        player_valid_clues.sort(key=lambda x: x[0])
                         # Pick the last clue in the list (prefering clues with more information)
-                        return valid_clues[-1][1]
+                        return player_valid_clues[-1][1]
                     else:
                         logging.debug(f"Player {player} has no valid clues")
 
